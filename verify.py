@@ -12,11 +12,11 @@ from resnet import get_resnet, name_to_params
 
 
 class ImagenetValidationDataset(Dataset):
-    def __init__(self, val_path):
+    def __init__(self, val_path, ground_truth_path): # Modified to take in separate path for ground truth
         super().__init__()
         self.val_path = val_path
         self.transform = transforms.Compose([transforms.Resize(256), transforms.CenterCrop(224), transforms.ToTensor()])
-        with open(os.path.join(val_path, 'ILSVRC2012_validation_ground_truth.txt')) as f:
+        with open(ground_truth_path) as f:
             self.labels = [int(l) - 1 for l in f.readlines()]
 
     def __len__(self):
@@ -42,7 +42,7 @@ def accuracy(output, target, topk=(1,)):
 @torch.no_grad()
 def run(pth_path):
     device = 'cuda'
-    dataset = ImagenetValidationDataset('./val/')
+    dataset = ImagenetValidationDataset('/work/data/imagenet/val/val', '/home/eecs/tiffany_ding/data/ILSVRC2012_devkit_t12/data/ILSVRC2012_validation_ground_truth.txt') # MODIFIED
     data_loader = DataLoader(dataset, batch_size=64, shuffle=False, pin_memory=True, num_workers=8)
     model, _ = get_resnet(*name_to_params(pth_path))
     model.load_state_dict(torch.load(pth_path)['resnet'])
