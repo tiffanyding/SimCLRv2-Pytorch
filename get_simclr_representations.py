@@ -10,6 +10,7 @@ from collections import Counter
 import pdb
 
 import torch
+import torchvision
 from PIL import Image
 from tqdm import tqdm
 import torchvision.transforms as transforms
@@ -33,25 +34,33 @@ class ImagenetValidationDataset(Dataset):
         img = Image.open(os.path.join(self.val_path, f'ILSVRC2012_val_{item + 1:08d}.JPEG')).convert('RGB')
         return self.transform(img), self.labels[item]
 
+
+
 @torch.no_grad()
-def run(pth_path):
+def run(pth_path, train_or_val):
     device = 'cuda'
-    dataset = ImagenetValidationDataset('/work/data/imagenet/val/val', '/home/eecs/tiffany_ding/data/ILSVRC2012_devkit_t12/data/ILSVRC2012_validation_ground_truth.txt') # MODIFIED
-    dataloader = DataLoader(dataset, batch_size=64, shuffle=False, pin_memory=True, num_workers=0)
+    if train_or_val == 'val':
+        dataset = ImagenetValidationDataset('/work/data/imagenet/val/val', '/home/eecs/tiffany_ding/data/ILSVRC2012_devkit_t12/data/ILSVRC2012_validation_ground_truth.txt') # MODIFIED
+    else:
+        #dataset = torchvision.datasets.ImageFolder('/work/data/imagenet/train')
+        dataset = torchvision.datasets.ImageFolder('/home/eecs/tiffany_ding/data/imagenet/train',
+                transform=transforms.Compose([transforms.Resize(256), transforms.CenterCrop(224), transforms.ToTensor()]))
+    dataloader = DataLoader(dataset, batch_size=32, shuffle=False, pin_memory=True, num_workers=0)
     net, _ = get_resnet(*name_to_params(pth_path)) # renamed model --> net
 
     print('==> loading encoder from checkpoint..')
     net.load_state_dict(torch.load(pth_path)['resnet'])
-    net = net.to(device)
 
     #net = torch.nn.dataparallel(net, device_ids = [0,1])
     #torch.backends.cudnn.benchmark = true
-    # if device == 'cuda':
+    print('Number of GPUs available:', torch.cuda.device_count())
+    if device == 'cuda':
     #     repr_dim = net.channels_out
-    #     net = torch.nn.dataparallel(net)
+        net = torch.nn.DataParallel(net)
     #     net.representation_dim = repr_dim
-    #     torch.backends.cudnn.benchmark = true
+        torch.backends.cudnn.benchmark = True
 
+    net = net.to(device)
     net.eval()
 
     features = [] 
@@ -63,20 +72,22 @@ def run(pth_path):
         representation = net(inputs)
         features += [representation.cpu()]
         labels += [targets.cpu()]
+        # break # TO TEST
 
     features = torch.cat(features,dim=0)
     labels = torch.cat(labels,dim=0)
     
-    save_to = '/home/eecs/tiffany_ding/code/simclrv2-pytorch/.cache/simclr_representations/imagenet_val'
+    save_to = f'/home/eecs/tiffany_ding/code/SimCLRv2-Pytorch/.cache/simclr_representations/imagenet_{train_or_val}'
     torch.save(features,save_to + '_features.pt')
     torch.save(labels,save_to + '_labels.pt')
-    print('Saved features and labels to', save_to)
+    print(f'Saved features and labels to {save_to}_{{features, labels}}.pt')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='SimCLR verifier')
+    parser.add_argument('dataset', type=str, help='which ImageNet dataset to use (train or val)')
     parser.add_argument('--pth_path', type=str, default='r152_3x_sk1.pth',  help='path of the input checkpoint file')
     args = parser.parse_args()
-    run(args.pth_path)
+    run(args.pth_path, args.dataset)
 
 
 #####

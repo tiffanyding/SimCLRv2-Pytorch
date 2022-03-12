@@ -48,17 +48,19 @@ def run(args):
     features = torch.load(representation_location+'_features.pt')
     labels = torch.load(representation_location+'_labels.pt')
     clfdataset = torch.utils.data.TensorDataset(features,labels)
-    clftrainloader = DataLoader(clfdataset, batch_size=64, shuffle=False, pin_memory=True, num_workers=0)
-    testloader = DataLoader(clfdataset, batch_size=64, shuffle=False, pin_memory=True, num_workers=0) # NOTE: currently testing on the same dataset we are training on
-
+    train_size = int(len(clfdataset) * 0.7)
+    train_dataset, test_dataset = torch.utils.data.random_split(clfdataset, [train_size, len(clfdataset)-train_size], generator=torch.Generator().manual_seed(0))
+    clftrainloader = DataLoader(train_dataset, batch_size=64, shuffle=False, pin_memory=True, num_workers=0)
+    testloader = DataLoader(test_dataset, batch_size=64, shuffle=False, pin_memory=True, num_workers=0)
     num_classes = 1000
     clf = torch.nn.Linear(features.shape[1], num_classes).to(device)
     clf.train()
     
     criterion = torch.nn.CrossEntropyLoss()
-    clf_optimizer = torch.optim.Adam(clf.parameters(), lr=1e-4)
+    clf_optimizer = torch.optim.Adam(clf.parameters(), lr=.001, weight_decay=1e-6)
 
     for epoch in range(args.num_epochs):
+        print('Epoch', epoch)
         train_loss = 0
         t = tqdm(enumerate(clftrainloader), desc='Loss: **** ', total=len(clftrainloader), bar_format='{desc}{bar}{r_bar}')
         for batch_idx, (features, targets) in t:
@@ -77,7 +79,7 @@ def run(args):
         print(f"Accuracy: {acc:.3f}%")
 
     # Save trained classifier weights
-    save_to = f'.cache/trained_classifiers/val-all_epochs={args.num_epochs}.pt'
+    save_to = f'.cache/trained_classifiers/val-0.7_epochs={args.num_epochs}.pt'
     torch.save(clf.state_dict(), save_to)
     print(f'Saved classifier weights to {save_to}')
 
