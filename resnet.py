@@ -120,6 +120,7 @@ class ResNet(nn.Module):
         ops.append(Blocks(layers[3], channels_in, 512 * width_multiplier, 2, sk_ratio))
         channels_in = ops[-1].channels_out
         self.channels_out = channels_in
+        #breakpoint()
         self.net = nn.Sequential(*ops)
         self.fc = nn.Linear(channels_in, 1000)
 

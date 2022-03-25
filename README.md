@@ -1,4 +1,15 @@
 # SimCLRv2-Pytorch
+
+## My procedure:
+```
+python download.py r152_3x_sk1
+python convert.py r152_3x_sk1/model.ckpt-250228
+python get_simclr_representations.py train r152_3x_sk1.pth
+python train_linear_and_get_logits.py 
+```
+
+## Original README
+
 Pretrained SimCLRv2 models in Pytorch
 
 ```python

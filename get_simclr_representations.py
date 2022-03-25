@@ -18,46 +18,47 @@ from torch.utils.data import Dataset, DataLoader
 
 from resnet import get_resnet, name_to_params
 
-
-class ImagenetValidationDataset(Dataset):
-    def __init__(self, val_path, ground_truth_path): # Modified to take in separate path for ground truth
-        super().__init__()
-        self.val_path = val_path
-        self.transform = transforms.Compose([transforms.Resize(256), transforms.CenterCrop(224), transforms.ToTensor()])
-        with open(ground_truth_path) as f:
-            self.labels = [int(l) - 1 for l in f.readlines()]
-
-    def __len__(self):
-        return len(self.labels)
-
-    def __getitem__(self, item):
-        img = Image.open(os.path.join(self.val_path, f'ILSVRC2012_val_{item + 1:08d}.JPEG')).convert('RGB')
-        return self.transform(img), self.labels[item]
+#class ImagenetValidationDataset(Dataset):
+#    def __init__(self, val_path, ground_truth_path): # Modified to take in separate path for ground truth
+#        super().__init__()
+#        self.val_path = val_path
+#        self.transform = transforms.Compose([transforms.Resize(256), transforms.CenterCrop(224), transforms.ToTensor()])
+#        with open(ground_truth_path) as f:
+#            self.labels = [int(l) - 1 for l in f.readlines()]
+#
+#    def __len__(self):
+#        return len(self.labels)
+#
+#    def __getitem__(self, item):
+#        img = Image.open(os.path.join(self.val_path, f'ILSVRC2012_val_{item + 1:08d}.JPEG')).convert('RGB')
+#        return self.transform(img), self.labels[item]
 
 
 
 @torch.no_grad()
-def run(pth_path, train_or_val):
+def run(pth_path, train_or_val, batch_size):
     device = 'cuda'
-    if train_or_val == 'val':
-        dataset = ImagenetValidationDataset('/work/data/imagenet/val/val', '/home/eecs/tiffany_ding/data/ILSVRC2012_devkit_t12/data/ILSVRC2012_validation_ground_truth.txt') # MODIFIED
+    if train_or_val == 'train':
+        path = '/home/eecs/tiffany_ding/data/imagenet/train' 
     else:
-        #dataset = torchvision.datasets.ImageFolder('/work/data/imagenet/train')
-        dataset = torchvision.datasets.ImageFolder('/home/eecs/tiffany_ding/data/imagenet/train',
+        path = '/data/imagenetwhole/ilsvrc2012/val'
+        if not os.path.isdir(path):
+            print('ERROR: TO access ImageNet-val, use the node "ace". Exiting...')
+            exit()
+            
+
+    print(f'Loading data from {path}')
+    dataset = torchvision.datasets.ImageFolder(path,
                 transform=transforms.Compose([transforms.Resize(256), transforms.CenterCrop(224), transforms.ToTensor()]))
-    dataloader = DataLoader(dataset, batch_size=32, shuffle=False, pin_memory=True, num_workers=0)
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, pin_memory=False, num_workers=0)
     net, _ = get_resnet(*name_to_params(pth_path)) # renamed model --> net
 
     print('==> loading encoder from checkpoint..')
     net.load_state_dict(torch.load(pth_path)['resnet'])
 
-    #net = torch.nn.dataparallel(net, device_ids = [0,1])
-    #torch.backends.cudnn.benchmark = true
     print('Number of GPUs available:', torch.cuda.device_count())
     if device == 'cuda':
-    #     repr_dim = net.channels_out
         net = torch.nn.DataParallel(net)
-    #     net.representation_dim = repr_dim
         torch.backends.cudnn.benchmark = True
 
     net = net.to(device)
@@ -83,11 +84,12 @@ def run(pth_path, train_or_val):
     print(f'Saved features and labels to {save_to}_{{features, labels}}.pt')
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='SimCLR verifier')
+    parser = argparse.ArgumentParser(description='Get SimCLR representations')
     parser.add_argument('dataset', type=str, help='which ImageNet dataset to use (train or val)')
     parser.add_argument('--pth_path', type=str, default='r152_3x_sk1.pth',  help='path of the input checkpoint file')
+    parser.add_argument("--batch_size", type=int, default=64, help='batch size')
     args = parser.parse_args()
-    run(args.pth_path, args.dataset)
+    run(args.pth_path, args.dataset, args.batch_size)
 
 
 #####
