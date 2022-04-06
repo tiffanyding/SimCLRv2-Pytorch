@@ -38,13 +38,15 @@ from resnet import get_resnet, name_to_params
 @torch.no_grad()
 def run(pth_path, train_or_val, batch_size):
     device = 'cuda'
-    if train_or_val == 'train':
-        path = '/home/eecs/tiffany_ding/data/imagenet/train' 
-    else:
-        path = '/data/imagenetwhole/ilsvrc2012/val'
-        if not os.path.isdir(path):
-            print('ERROR: TO access ImageNet-val, use the node "ace". Exiting...')
-            exit()
+    path = f'/home/eecs/tiffany_ding/data/imagenet/{train_or_val}' 
+#     if train_or_val == 'train':
+#         path = '/home/eecs/tiffany_ding/data/imagenet/train' 
+#     else:
+#         path = 
+#         path = '/data/imagenetwhole/ilsvrc2012/val'
+#         if not os.path.isdir(path):
+#             print('ERROR: TO access ImageNet-val, use the node "ace". Exiting...')
+#             exit()
             
 
     print(f'Loading data from {path}')

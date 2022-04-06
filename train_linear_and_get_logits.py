@@ -53,7 +53,8 @@ def get_train_and_val_dataloaders(batch_size=64):
         # breakpoint()
         print('Dimension of features:', features.shape)
         dataset = torch.utils.data.TensorDataset(features,labels)
-        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, pin_memory=True, num_workers=0)
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, pin_memory=True, num_workers=0)
+#         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, pin_memory=True, num_workers=0)
         dataloader_list.append(dataloader)
 
     return dataloader_list[0], dataloader_list[1]
@@ -74,20 +75,22 @@ def get_split_dataloaders(dataset_name, train_split, test_split='default', calib
     train_size = int(len(clfdataset) * train_split)
     if test_split == 'default': # Everything that is not in train will be included in test
         test_size = len(clfdataset) - train_size
-        splits = [train_size, test_size]
-        train_dataset, test_dataset = torch.utils.data.random_split(clfdataset, splits, generator=torch.Generator().manual_seed(0))
+        calib_size = 0
+        splits = [train_size, test_size, calib_size]
+        train_dataset, test_dataset, calibration_dataset = torch.utils.data.random_split(clfdataset, splits, generator=torch.Generator().manual_seed(0))
     else:
         test_size = int(len(clfdataset) * test_split)
         splits = [train_size, test_size, len(clfdataset) - (train_size + test_size)]
         train_dataset, test_dataset, calibration_dataset = torch.utils.data.random_split(clfdataset, splits, generator=torch.Generator().manual_seed(0))
-        if calib_only:
-            clftrainloader = None
-            testloader = None
-        else:
-            clftrainloader = DataLoader(train_dataset, batch_size=64, shuffle=False, pin_memory=True, num_workers=0)
-            testloader = DataLoader(test_dataset, batch_size=64, shuffle=False, pin_memory=True, num_workers=0)
         
-        calibloader = DataLoader(calibration_dataset, batch_size=64, shuffle=False, pin_memory=True, num_workers=0)
+    if calib_only:
+        clftrainloader = None
+        testloader = None
+    else:
+        clftrainloader = DataLoader(train_dataset, batch_size=64, shuffle=False, pin_memory=True, num_workers=0)
+        testloader = DataLoader(test_dataset, batch_size=64, shuffle=False, pin_memory=True, num_workers=0)
+        
+    calibloader = DataLoader(calibration_dataset, batch_size=64, shuffle=False, pin_memory=True, num_workers=0)
 
     print(f'Size of classifier training set: {train_size}')
     print(f'Size of classifier test set: {test_size}')
@@ -187,20 +190,21 @@ def train(clftrainloader, clftestloader, save_to, num_epochs, learning_rate=.001
 def run(args):
     
     # Set location to save weights
-    save_prefix = 'train-all' # UPDATE THIS AS NECESSARY
+    save_prefix = 'train-val' # UPDATE THIS AS NECESSARY
     #save_prefix = 'train-0.7'
     save_to = f'.cache/trained_classifiers/{save_prefix}_epochs={args.num_epochs}'
     print(f'After training, weights will be saved to {save_to}[...]')
     
     # OPTION 1: Train classifier and save weights
-    ## Load data
-    ## clftrainloader, testloader = get_split_dataloaders("train", train_split=0.7)
-#     clftrainloader, clftestloader = get_train_and_val_dataloaders(batch_size=64)
-#     train(clftrainloader, clftestloader, save_to, args.num_epochs, learning_rate=.01)
+    # Load data
+#     clftrainloader, clftestloader, _ = get_split_dataloaders("train", train_split=0.7)
+    clftrainloader, clftestloader = get_train_and_val_dataloaders(batch_size=64)
+    train(clftrainloader, clftestloader, save_to, args.num_epochs, learning_rate=.01)
     
+
     # OPTION 2: Train classifier and apply classifier to get logits for data not used to train
-    save_prefix = f'.cache/logits/imagenet_train_subset'
-    get_logits(save_prefix, num_epochs=args.num_epochs, weights_path=None)
+    #save_prefix = f'.cache/logits/imagenet_train_subset'
+    #get_logits(save_prefix, num_epochs=args.num_epochs, weights_path=None)
    
     # OPTION 3: Load pretrained classifier weights and apply classifier for data not used to train
 #     save_prefix = f'.cache/logits/imagenet_train_subset'
