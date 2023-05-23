@@ -1,6 +1,7 @@
 # SimCLRv2-Pytorch
 
 ## My procedure:
+First, download ImageNet and update the `path` variable in `run()` (located in `get_simclr_representations.py`) as needed. Then, run: 
 ```
 python download.py r152_3x_sk1
 python convert.py r152_3x_sk1/model.ckpt-250228
